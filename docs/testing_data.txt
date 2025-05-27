@@ -1,0 +1,5 @@
+The capital of France is Paris.
+LangChain is a framework for developing applications powered by language models.
+Gemini is a family of multimodal AI models developed by Google.
+The Eiffel Tower is a famous landmark in Paris, France.
+To build a RAG system, you need to load documents, split them, create embeddings, store them in a vector database, and then retrieve relevant chunks to answer questions.

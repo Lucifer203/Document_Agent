@@ -1,0 +1,12 @@
+requests
+langchain
+langchain-community
+ipykernel
+faiss-cpu
+chromadb
+beautifulsoup4
+lxml
+langchain-google-genai
+google-generativeai
+pypdf
+python-dotenv
