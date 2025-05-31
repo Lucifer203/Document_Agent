@@ -10,6 +10,8 @@ from langchain.memory import ConversationBufferMemory
 from langchain.prompts import PromptTemplate
 load_dotenv()
 import google.generativeai as genai
+import re
+from langchain_core.chat_history import InMemoryChatMessageHistory
 
 GEMINI_API_KEY  = os.getenv("GEMINI_API_KEY")
 
@@ -70,9 +72,36 @@ except Exception as e:
 llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash",google_api_key=GEMINI_API_KEY)
 print("LLM initialized successfully.")
 
+## initializing memory
+# memory = ConversationBufferMemory(
+#     return_messages=True,
+#     input_key="input",
+#     output_key="output"
+# )
+
+chat_history = InMemoryChatMessageHistory()
+
+prompt_template = """
+Use context and chat history to answer:
+Context: {context}
+Chat History: {chat_history}
+Question: {input}
+Answer:"""
+
+PROMPT = PromptTemplate(template=prompt_template,
+                        input_variables=["context","chat_history","input"])
+
 # Create the QA chain
-qa_chain = load_qa_chain(llm, chain_type="stuff")
+# qa_chain = load_qa_chain(llm, chain_type="stuff")
+qa_chain = PROMPT | llm
 print("QA chain loaded successfully.")
+
+chain_with_history = RunnableWithMessageHistory(
+    qa_chain,
+    lambda session_id: chat_history,
+    input_messages_key="input",
+    history_messages_key="chat_history"
+)
 
 
 
@@ -97,29 +126,58 @@ def handle_information_collection(query):
         COLLECTING_INFO_STATE = "PHONE"
         response = "Thank you, {name}. What is your phone number?"
     elif COLLECTING_INFO_STATE == "PHONE":
-        if query.replace("+","").replace(" ", "").isdigit() and len(query.replace(" ","")) == 10:
-            USER_INFO["phone"] = query
+        phone_regex = r"^\+?[\d\s\-\(\)]{7,}$" 
+        if re.fullmatch(phone_regex,query.strip()) and sum(c.isdigit() for c in query) >= 9:
+            USER_INFO["phone"] = query.strip()
             COLLECTING_INFO_STATE = "EMAIL"
             response = "Great. And finally, what is your email address?"
+
+
         else:
             response = "Please provide a valid phone number."
     elif COLLECTING_INFO_STATE == "EMAIL":
-        if "@" in query and "." in query.split("@")[-1]:
-            USER_INFO["email"] = query
-            response = (f"Thank you, {USER_INFO.get('name', 'User')}! I got your details:\n "
-                        f"Phone: {USER_INFO.get('phone', 'Not provided')}\n"
-                        f"Email: {USER_INFO.get('email', 'Not provided')}\n")
-            print(f"Collected user information: {USER_INFO}")
-            COLLECTING_INFO_STATE = None
-            USER_INFO = {}
+        # Regex for a common email pattern
+        email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+        if re.fullmatch(email_regex, query.strip()):
+            USER_INFO["email"] = query.strip()
+            response = (f"Thank you, {USER_INFO.get('name', 'User')}! We have your details:\n"
+                        f"Phone: {USER_INFO.get('phone')}\n"
+                        f"Email: {USER_INFO.get('email')}\n"
+                        "Ok I got your information. What else can I help you with?")
+            print(f"Collected User Info: {USER_INFO}")
+            COLLECTING_INFO_STATE = None # Reset state
+            # USER_INFO = {} # We might want to keep user_info if memory is to retain it across turns after collection.
+                        # For now, let's clear it as per previous logic, memory will store the conversation.
         else:
-            response = "Please provide a valid email address."
+            response = "That doesn't look like a valid email address. Please enter a valid email address (e.g., user@example.com)."
+  
     else:
         response = "I'm not sure. Could you please clarify ?"
         COLLECTING_INFO_STATE = None
 
     return response
 
+
+
+
+def handle_conversation(query, session_id="default"):
+    relevant_docs = vector_store.similarity_search(query, k=3)
+    if not relevant_docs:
+        return "Sorry, I couldn't find relevant info."
+
+    try:
+        response = chain_with_history.invoke(
+            {
+                "input": query,
+                "context": "\n".join([doc.page_content for doc in relevant_docs]),
+                # "chat_history": memory.chat_memory.messages,
+            },
+            config={"configurable": {"session_id": session_id}},
+        )
+        return response.content if hasattr(response, 'content') else str(response)
+    except Exception as e:
+        print(f"Error: {e}")
+        return "An error occurred during processing."
 
 
 # Function to answer questions
@@ -139,25 +197,32 @@ def ask_question(query):
 
 
 
-
-## Example 
 # if __name__ == "__main__":
+#     session_id = "default"
 #     while True:
-#         user_query = input("\nEnter your question (or type 'exit' to quit): ")
+#         user_query = input("\nYou: ")
 #         if user_query.lower() == 'exit':
 #             print("Exiting the program.")
 #             break
-#         answer = ask_question(user_query)
-#         if answer is None:
-#             print("No answer found for your question.")
+
+#         bot_response = ""
+
+#         if COLLECTING_INFO_STATE:
+#             bot_response = handle_information_collection(user_query)
+#         elif is_call_request(user_query):
+#             COLLECTING_INFO_STATE = "NAME"
+#             USER_INFO = {}
+#             bot_response = "Sure! May I know your name, please?"
 #         else:
-#             print(f"Answer: {answer}")
-#         print("You can ask another question or type 'exit' to quit.")
+#             bot_response = ask_question(user_query)
+#             if not bot_response:
+#                 bot_response = "I'm sorry, I couldn't find an answer to your question."
+#         print(f"Bot: {bot_response}")
 #         print("-" * 100)
 
 
-
 if __name__ == "__main__":
+    session_id = "default"  # Could be dynamic per user
     while True:
         user_query = input("\nYou: ")
         if user_query.lower() == 'exit':
@@ -168,13 +233,19 @@ if __name__ == "__main__":
 
         if COLLECTING_INFO_STATE:
             bot_response = handle_information_collection(user_query)
+            # Store user info in memory if completed
+            if COLLECTING_INFO_STATE is None and USER_INFO:
+                user_info_message = f"My name is {USER_INFO['name']}, phone is {USER_INFO['phone']}, and email is {USER_INFO['email']}."
+                chat_history.add_user_message(user_info_message)
+                # memory.chat_memory.add_user_message(
+                #     f"My name is {USER_INFO['name']}, phone is {USER_INFO['phone']}, and email is {USER_INFO['email']}."
+                # )
         elif is_call_request(user_query):
             COLLECTING_INFO_STATE = "NAME"
             USER_INFO = {}
             bot_response = "Sure! May I know your name, please?"
         else:
-            bot_response = ask_question(user_query)
-            if not bot_response:
-                bot_response = "I'm sorry, I couldn't find an answer to your question."
+            bot_response = handle_conversation(user_query, session_id=session_id)
         print(f"Bot: {bot_response}")
         print("-" * 100)
+        # print(memory.input_key)
