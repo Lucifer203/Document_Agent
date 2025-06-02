@@ -1,2 +1,5 @@
 *.env
 /myenv
+__pycache__
+.gradio
+/docs

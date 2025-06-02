@@ -13,7 +13,7 @@ import google.generativeai as genai
 import re
 from langchain_core.chat_history import InMemoryChatMessageHistory
 from datetime import datetime, timedelta
-import pytz  # You might need to install this: pip install pytz
+import pytz  
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -27,12 +27,11 @@ if not GEMINI_API_KEY:
 
 genai.configure(api_key=GEMINI_API_KEY)
 
-# Set your local timezone (adjust as needed)
-local_tz = pytz.timezone('Asia/Kathmandu')  # Since you're in Kathmandu
+# local timezone 
+local_tz = pytz.timezone('Asia/Kathmandu')  
 
 DOCUMENT_PATH = "/home/lucifer/Documents/Agent/docs/5. Automated Personal Writing Pattern Replicator.pdf"
 
-# Load and process documents (same as your existing code)
 print(f"Loading document from {DOCUMENT_PATH}")
 if DOCUMENT_PATH.endswith('.txt'):
     loader = TextLoader(DOCUMENT_PATH)
@@ -75,12 +74,6 @@ print("LLM initialized successfully.")
 
 chat_history = InMemoryChatMessageHistory()
 
-# prompt_template = """
-# Use context and chat history to answer:
-# Context: {context}
-# Chat History: {chat_history}
-# Question: {input}
-# Answer:"""
 
 prompt_template = """You are a helpful assistant.
 
@@ -117,7 +110,7 @@ COLLECTING_INFO_STATE = None
 APPOINTMENT_STATE = None
 USER_INFO = {}
 APPOINTMENT_INFO = {}
-NEXT_ACTION = None  # NEW: Track what to do after collecting info
+NEXT_ACTION = None  # Track what to do after collecting info
 
 # Keywords for different intents
 CALL_REQUEST_KEYWORDS = ["call me","callback","contact me","reach out","phone me"]
@@ -271,7 +264,6 @@ def handle_information_collection(query):
 def handle_appointment_booking(query):
     global APPOINTMENT_STATE, APPOINTMENT_INFO, USER_INFO, COLLECTING_INFO_STATE,NEXT_ACTION
 
-    # If we haven't started the appointment process yet
     if not APPOINTMENT_STATE:
         if USER_INFO and USER_INFO.get('name') and USER_INFO.get('phone') and USER_INFO.get('email'):  # Check if user details already exist
             APPOINTMENT_STATE = "AWAITING_INFO_CHOICE"
@@ -372,8 +364,8 @@ def main():
         # Handle new call request
         elif is_call_request(user_query):
             COLLECTING_INFO_STATE = "NAME"
-            NEXT_ACTION = "CALLBACK"  # Remember we're collecting info for callback
-            USER_INFO = {}  # Reset user info to ensure fresh collection for callback
+            NEXT_ACTION = "CALLBACK"  
+            USER_INFO = {}  
             bot_response = "Sure! I'd be happy to arrange a callback. May I know your name, please?"
         
         # Handle regular document queries

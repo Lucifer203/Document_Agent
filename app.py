@@ -252,13 +252,14 @@ def handle_information_collection(query):
         return f"Thank you, {query}. What is your phone number?"
     
     elif COLLECTING_INFO_STATE == "PHONE":
-        phone_regex = r"^\+?[\d\s\-\(\)]{7,}$"
+        phone_regex = r"^(\+977\s*)?0?\d{10}$"
         if re.fullmatch(phone_regex, query.strip()) and sum(c.isdigit() for c in query) >= 9:
             USER_INFO["phone"] = query.strip()
             COLLECTING_INFO_STATE = "EMAIL"
             return "Great! And finally, what is your email address?"
         else:
-            return "Please provide a valid phone number."
+            return "Please provide a valid phone number.\
+                eg:- 9876543210"
     
     elif COLLECTING_INFO_STATE == "EMAIL":
         email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
@@ -594,7 +595,7 @@ with gr.Blocks(title="Document AI Chatbot", theme=gr.themes.Soft()) as app:
 if __name__ == "__main__":
     app.launch(
         share=True,
-        server_name="0.0.0.0",
+        server_name="127.0.0.1",
         server_port=7860,
         show_error=True
     )
