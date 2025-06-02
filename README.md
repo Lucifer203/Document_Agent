@@ -39,8 +39,8 @@ Follow these steps to get your Document AI Chatbot up and running locally:
 ### 1. Clone the Repository
 
 ```bash
-git clone <repository name>
-cd <your-repository-name>
+git clone git@github.com:Lucifer203/Document_Agent.git
+cd Document_Agent
 ````
 
 ### 2\. Create and Activate a Virtual Environment
